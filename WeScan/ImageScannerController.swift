@@ -33,6 +33,14 @@ public protocol ImageScannerControllerDelegate: NSObjectProtocol {
     ///   - scanner: The scanner controller object managing the scanning interface.
     ///   - error: The error that occured.
     func imageScannerController(_ scanner: ImageScannerController, didFailWithError error: Error)
+
+    /// Tells if ReviewViewController should be pushed onto a stack.
+    ///
+    /// - Parameters:
+    ///   - scanner: The scanner controller object managing the scanning interface.
+    /// - Returns: boolen value indicating if ReviewViewController should be pushed onto a stack.
+
+    func imageScannerControllerShouldShowReview(_ scanner: ImageScannerController) -> Bool
 }
 
 /// A view controller that manages the full flow for scanning documents.

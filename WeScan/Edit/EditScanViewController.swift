@@ -36,6 +36,12 @@ final class EditScanViewController: UIViewController {
         button.tintColor = navigationController?.navigationBar.tintColor
         return button
     }()
+
+    private lazy var doneButton: UIBarButtonItem = {
+        let button = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(finishScan))
+        button.tintColor = navigationController?.navigationBar.tintColor
+        return button
+    }()
     
     private lazy var cancelButton: UIBarButtonItem = {
         let title = NSLocalizedString("wescan.scanning.cancel", tableName: nil, bundle: Bundle(for: EditScanViewController.self), value: "Cancel", comment: "A generic cancel button")
@@ -73,7 +79,15 @@ final class EditScanViewController: UIViewController {
         setupViews()
         setupConstraints()
         title = NSLocalizedString("wescan.edit.title", tableName: nil, bundle: Bundle(for: EditScanViewController.self), value: "Edit Scan", comment: "The title of the EditScanViewController")
-        navigationItem.rightBarButtonItem = nextButton
+
+        if let imageScannerController = navigationController as? ImageScannerController,
+           imageScannerController.imageScannerDelegate?.imageScannerControllerShouldShowReview(imageScannerController) == false {
+
+            navigationItem.rightBarButtonItem = doneButton
+        } else {
+            navigationItem.rightBarButtonItem = nextButton
+        }
+
         if let firstVC = self.navigationController?.viewControllers.first, firstVC == self {
             navigationItem.leftBarButtonItem = cancelButton
         } else {
@@ -137,39 +151,51 @@ final class EditScanViewController: UIViewController {
     }
     
     @objc func pushReviewController() {
+        guard let results = prepareImageResults() else { return }
+        
+        let reviewViewController = ReviewViewController(results: results)
+        navigationController?.pushViewController(reviewViewController, animated: true)
+    }
+
+    @objc private func finishScan() {
+        guard let results = prepareImageResults() else { return }
+
+        guard let imageScannerController = navigationController as? ImageScannerController else { return }
+
+        imageScannerController.imageScannerDelegate?.imageScannerController(imageScannerController, didFinishScanningWithResults: results)
+    }
+
+    private func prepareImageResults() -> ImageScannerResults? {
         guard let quad = quadView.quad,
             let ciImage = CIImage(image: image) else {
                 if let imageScannerController = navigationController as? ImageScannerController {
                     let error = ImageScannerControllerError.ciImageCreation
                     imageScannerController.imageScannerDelegate?.imageScannerController(imageScannerController, didFailWithError: error)
                 }
-                return
+                return nil
         }
         let cgOrientation = CGImagePropertyOrientation(image.imageOrientation)
         let orientedImage = ciImage.oriented(forExifOrientation: Int32(cgOrientation.rawValue))
         let scaledQuad = quad.scale(quadView.bounds.size, image.size)
         self.quad = scaledQuad
-        
+
         // Cropped Image
         var cartesianScaledQuad = scaledQuad.toCartesian(withHeight: image.size.height)
         cartesianScaledQuad.reorganize()
-        
+
         let filteredImage = orientedImage.applyingFilter("CIPerspectiveCorrection", parameters: [
             "inputTopLeft": CIVector(cgPoint: cartesianScaledQuad.bottomLeft),
             "inputTopRight": CIVector(cgPoint: cartesianScaledQuad.bottomRight),
             "inputBottomLeft": CIVector(cgPoint: cartesianScaledQuad.topLeft),
             "inputBottomRight": CIVector(cgPoint: cartesianScaledQuad.topRight)
         ])
-        
+
         let croppedImage = UIImage.from(ciImage: filteredImage)
         // Enhanced Image
         let enhancedImage = filteredImage.applyingAdaptiveThreshold()?.withFixedOrientation()
         let enhancedScan = enhancedImage.flatMap { ImageScannerScan(image: $0) }
-        
-        let results = ImageScannerResults(detectedRectangle: scaledQuad, originalScan: ImageScannerScan(image: image), croppedScan: ImageScannerScan(image: croppedImage), enhancedScan: enhancedScan)
-        
-        let reviewViewController = ReviewViewController(results: results)
-        navigationController?.pushViewController(reviewViewController, animated: true)
+
+        return ImageScannerResults(detectedRectangle: scaledQuad, originalScan: ImageScannerScan(image: image), croppedScan: ImageScannerScan(image: croppedImage), enhancedScan: enhancedScan)
     }
     
     private func displayQuad() {
