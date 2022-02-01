@@ -166,7 +166,7 @@ final class EditScanViewController: UIViewController {
     }
 
     private func prepareImageResults() -> ImageScannerResults? {
-        guard let quad = quadView.quad,
+        guard var quad = quadView.quad,
             let ciImage = CIImage(image: image) else {
                 if let imageScannerController = navigationController as? ImageScannerController {
                     let error = ImageScannerControllerError.ciImageCreation
@@ -176,6 +176,16 @@ final class EditScanViewController: UIViewController {
         }
         let cgOrientation = CGImagePropertyOrientation(image.imageOrientation)
         let orientedImage = ciImage.oriented(forExifOrientation: Int32(cgOrientation.rawValue))
+        
+        quad.topLeft.x -= 10.0
+        quad.topLeft.y -= 10.0
+        quad.topRight.x += 10.0
+        quad.topRight.y -= 10.0
+        quad.bottomLeft.x -= 10.0
+        quad.bottomLeft.y += 10.0
+        quad.bottomRight.x += 10.0
+        quad.bottomRight.y += 10.0
+
         let scaledQuad = quad.scale(quadView.bounds.size, image.size)
         self.quad = scaledQuad
 
